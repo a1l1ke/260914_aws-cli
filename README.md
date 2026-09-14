@@ -6,9 +6,10 @@ curl -fsSL https://awscli.amazonaws.com/v2/install.sh | bash\nexport PATH="$HOME
 # Windows (Git Bash): 공식 MSI 설치 관리자 내려받아 설치
 curl -o AWSCLIV2.msi https://awscli.amazonaws.com/AWSCLIV2.msi
 MSYS_NO_PATHCONV=1 msiexec.exe /i AWSCLIV2.msi /qn
-# --------
 aws --version
-# --------
+```
+
+```sh
 aws configure sso --profile studentXX
 
 # SSO session name: infra-training
@@ -21,3 +22,4 @@ aws configure sso --profile studentXX
 
 aws sts get-caller-identity --profile studentXX
 ```
+
