@@ -71,3 +71,63 @@ aws ec2 describe-security-groups --group-ids "$MY_SG_ID" \
   --query "SecurityGroups[0].IpPermissions[].{Port:FromPort,Proto:IpProtocol,Cidr:IpRanges[0].CidrIp}" \
   --output table
 ```
+
+```sh
+export MY_KEY_NAME="studentXX-key"
+
+aws ec2 create-key-pair \
+  --key-name "$MY_KEY_NAME" \
+  --query "KeyMaterial" \
+  --output text > ./"$MY_KEY_NAME".pem
+
+ls -l *.pem
+```
+
+```sh
+chmod 400 *.pem
+ls -l *.pem
+```
+
+```sh
+# 1. 서울 리전 최신 Ubuntu 26.04 ARM AMI 조회
+export AMI_ID=$(aws ssm get-parameter \
+  --name /aws/service/canonical/ubuntu/server/26.04/stable/current/arm64/hvm/ebs-gp3/ami-id \
+  --query "Parameter.Value" --output text)
+echo "최신 Ubuntu ARM AMI:$AMI_ID"
+
+# 2. 인스턴스 프로비저닝
+export INSTANCE_ID=$(aws ec2 run-instances \
+  --image-id "$AMI_ID" \
+  --instance-type t4g.nano \
+  --key-name "$MY_KEY_NAME" \
+  --security-group-ids "$MY_SG_ID" \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=student01-test-ec2},{Key=Course,Value=infra-training}]" \
+  --query "Instances[0].InstanceId" --output text)
+echo "프로비저닝 인스턴스 ID:$INSTANCE_ID"
+
+# 3. 상태 대기 (임의의 sleep 대신 공식 waiter 사용)
+aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+aws ec2 wait instance-status-ok --instance-ids "$INSTANCE_ID"
+
+# 4. 공인 IP 조회
+export PUBLIC_IP=$(aws ec2 describe-instances \
+  --instance-ids "$INSTANCE_ID" \
+  --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+echo "할당된 퍼블릭 IP:$PUBLIC_IP"
+```
+
+```sh
+ssh -i "$MY_KEY_NAME".pem -o StrictHostKeyChecking=accept-new ubuntu@"$PUBLIC_IP"
+
+uname -m                                  # 출력: aarch64
+grep PRETTY_NAME /etc/os-release          # 출력: Ubuntu 26.04.1 LTS
+free -h | head -2                         # t4g.nano 메모리 약 405Mi
+
+exit
+```
+
+```sh
+aws ec2 stop-instances --instance-ids "$INSTANCE_ID"
+aws ec2 wait instance-stopped --instance-ids "$INSTANCE_ID"
+echo "인스턴스가 안전하게 중지(Stopped)되었습니다."
+```
